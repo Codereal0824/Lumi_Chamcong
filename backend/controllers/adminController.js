@@ -1,5 +1,5 @@
 const ExcelJS = require('exceljs');
-const { POSITIONS, hashPassword, publicUser } = require('./authController');
+const { POSITIONS, hashPassword, verifyPassword, publicUser } = require('./authController');
 const { verifySmtp, sendTestEmail } = require('../services/email');
 
 function filters(req) {
@@ -43,21 +43,21 @@ function dashboardStats(req, res) {
 }
 async function exportExcel(req, res) {
   const { clause, params } = filters(req);
-  const rows = req.app.locals.db.prepare(`SELECT u.full_name, u.position, a.date, a.check_in, a.check_out, a.leave_days, a.early_leave_hours, a.ot_hours, a.late_minutes, a.sunday_work, a.sunday_check_in, a.sunday_check_out, a.field_trip_days, a.customer_name, a.note, a.status FROM attendances a JOIN users u ON u.id = a.user_id ${clause} ORDER BY a.date DESC`).all(params);
+  const rows = req.app.locals.db.prepare(`SELECT u.full_name, u.position, a.date, a.check_in, a.check_out, a.leave_days, a.early_leave_hours, a.ot_hours, a.advance_salary, a.late_minutes, a.sunday_work, a.sunday_check_in, a.sunday_check_out, a.field_trip_days, a.customer_name, a.note, a.status FROM attendances a JOIN users u ON u.id = a.user_id ${clause} ORDER BY a.date DESC`).all(params);
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Timesheet');
   sheet.columns = [
     { header: 'Nhân viên', key: 'employee', width: 25 }, { header: 'Chức vụ', key: 'position', width: 18 }, { header: 'Ngày', key: 'date', width: 14 },
     { header: 'Check-in', key: 'checkIn', width: 12 }, { header: 'Check-out', key: 'checkOut', width: 12 },
     { header: 'Nghỉ phép', key: 'leaveDays', width: 12 }, { header: 'Về sớm (giờ)', key: 'earlyLeave', width: 14 },
-    { header: 'OT (giờ)', key: 'overtime', width: 12 },
+    { header: 'OT (giờ)', key: 'overtime', width: 12 }, { header: 'Ứng lương (VNĐ)', key: 'advanceSalary', width: 18 },
     { header: 'Làm CN', key: 'sundayWork', width: 12 }, { header: 'Giờ làm CN', key: 'sundayHours', width: 18 },
     { header: 'Đi xa (ngày)', key: 'travelDays', width: 14 },
     { header: 'Địa điểm / Khách hàng', key: 'site', width: 30 }, { header: 'Nội dung công việc (Ghi chú)', key: 'note', width: 42 }, { header: 'Trạng thái', key: 'status', width: 14 }
   ];
   rows.forEach(row => sheet.addRow({
     employee: row.full_name, position: row.position, date: row.date, checkIn: row.check_in, checkOut: row.check_out,
-    leaveDays: row.leave_days, earlyLeave: row.early_leave_hours, overtime: row.ot_hours,
+    leaveDays: row.leave_days, earlyLeave: row.early_leave_hours, overtime: row.ot_hours, advanceSalary: row.advance_salary || 0,
     sundayWork: row.sunday_work ? 'Có' : 'Không',
     sundayHours: row.sunday_work ? `${row.sunday_check_in} - ${row.sunday_check_out}` : '',
     travelDays: row.field_trip_days, site: row.customer_name, note: row.note, status: row.status
@@ -67,6 +67,7 @@ async function exportExcel(req, res) {
     leaveDays: rows.reduce((total, row) => total + Number(row.leave_days || 0), 0),
     earlyLeave: rows.reduce((total, row) => total + Number(row.early_leave_hours || 0), 0),
     overtime: rows.reduce((total, row) => total + Number(row.ot_hours || 0), 0),
+    advanceSalary: rows.reduce((total, row) => total + Number(row.advance_salary || 0), 0),
     sundayWork: rows.reduce((total, row) => total + (row.sunday_work ? 1 : 0), 0),
     travelDays: rows.reduce((total, row) => total + Number(row.field_trip_days || 0), 0)
   });
@@ -75,7 +76,7 @@ async function exportExcel(req, res) {
   [6, 7, 8, 9, 11].forEach(column => { totalRow.getCell(column).numFmt = 'General'; });
   sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
   sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } };
-  sheet.autoFilter = { from: 'A1', to: 'N1' };
+  sheet.autoFilter = { from: 'A1', to: 'O1' };
   res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="fieldflow-timesheet.xlsx"' });
   await workbook.xlsx.write(res);
   res.end();
@@ -88,6 +89,18 @@ function listUsers(req, res) {
   if (['active', 'inactive'].includes(accountStatus)) { where.push('u.account_status = @accountStatus'); params.accountStatus = accountStatus; }
   const rows = req.app.locals.db.prepare(`SELECT u.* FROM users u ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY u.created_at DESC, u.id DESC`).all(params);
   res.json({ data: rows.map(publicUser), positions: POSITIONS });
+}
+function changePassword(req, res) {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+  if (!currentPassword || !newPassword || !confirmPassword) return res.status(400).json({ message: 'Vui lòng nhập đầy đủ mật khẩu cũ và mật khẩu mới.' });
+  if (newPassword !== confirmPassword) return res.status(400).json({ message: 'Mật khẩu mới nhập lại không khớp.' });
+  if (String(newPassword).length < 6) return res.status(400).json({ message: 'Mật khẩu mới phải có ít nhất 6 ký tự.' });
+  if (currentPassword === newPassword) return res.status(400).json({ message: 'Mật khẩu mới phải khác mật khẩu cũ.' });
+  const db = req.app.locals.db;
+  const user = db.prepare("SELECT * FROM users WHERE id = ? AND role = 'admin' AND account_status = 'active'").get(req.user.id);
+  if (!user || !verifyPassword(String(currentPassword), user.password_hash)) return res.status(401).json({ message: 'Mật khẩu cũ không đúng.' });
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(String(newPassword)), user.id);
+  res.json({ message: 'Đổi mật khẩu admin thành công.' });
 }
 function createUser(req, res) {
   const { username, password, fullName, email = '', phone = '', role = 'technician', position = 'Kỹ thuật viên' } = req.body;
@@ -139,4 +152,4 @@ async function sendEmailTest(req, res) {
   try { await sendTestEmail(); res.json({ message: 'Đã gửi email kiểm tra đến Admin.' }); }
   catch (error) { res.status(error.code === 'authentication' ? 502 : 503).json({ message: error.message, type: error.code }); }
 }
-module.exports = { listAttendances, updateStatus, dashboardStats, exportExcel, listUsers, createUser, updateUser, getUser, verifyEmailConfiguration, sendEmailTest };
+module.exports = { listAttendances, updateStatus, dashboardStats, exportExcel, listUsers, createUser, updateUser, getUser, changePassword, verifyEmailConfiguration, sendEmailTest };

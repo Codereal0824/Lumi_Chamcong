@@ -10,6 +10,7 @@ router.get('/users', controller.listUsers);
 router.post('/users', controller.createUser);
 router.get('/users/:id', controller.getUser);
 router.put('/users/:id', controller.updateUser);
+router.put('/change-password', controller.changePassword);
 router.get('/email/verify', controller.verifyEmailConfiguration);
 router.post('/email/test', controller.sendEmailTest);
 module.exports = router;

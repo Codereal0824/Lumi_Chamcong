@@ -1,0 +1,167 @@
+:root {
+  --brand-yellow: #e1b51f;
+  --brand-yellow-dark: #b88d00;
+  --brand-cream: #fffdf5;
+  --brand-soft: #fff8dc;
+  --brand-border: #f0e2ad;
+}
+
+.brand-logo {
+  display: block;
+  width: 154px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.brand-mark {
+  color: #111827;
+}
+
+.landing-shell {
+  background: radial-gradient(circle at 85% 20%, #fff1b8 0, transparent 30%), var(--brand-cream);
+}
+
+.hero-glow {
+  background: #f8df6a55;
+}
+
+.btn-primary {
+  background: var(--brand-yellow);
+  color: #332600;
+  box-shadow: 0 8px 18px #d5aa1f45;
+}
+
+.btn-primary:hover {
+  background: var(--brand-yellow-dark);
+  color: #fff;
+}
+
+.btn-secondary:hover {
+  border-color: var(--brand-yellow);
+  background: var(--brand-soft);
+}
+
+.eyebrow {
+  color: var(--brand-yellow-dark);
+}
+
+.status-dot {
+  background: var(--brand-yellow);
+}
+
+.mobile-header {
+  background: var(--brand-cream);
+  border-bottom-color: var(--brand-border);
+}
+
+.avatar {
+  background: var(--brand-soft);
+  color: var(--brand-yellow-dark);
+}
+
+.section-number,
+.quick-option.active {
+  border-color: var(--brand-yellow);
+  background: var(--brand-soft);
+  color: var(--brand-yellow-dark);
+}
+
+.quick-option.active {
+  border-color: var(--brand-yellow);
+}
+
+.stepper button {
+  color: var(--brand-yellow-dark);
+}
+
+.stepper button:hover,
+.stepper button:active {
+  background: var(--brand-soft);
+  color: #806000;
+}
+
+.toggle:checked {
+  background: var(--brand-yellow);
+}
+
+.sidebar {
+  background: var(--brand-cream);
+  border-right: 1px solid var(--brand-border);
+}
+
+.nav-label {
+  color: #a58b43;
+}
+
+.nav-item {
+  color: #766a4a;
+}
+
+.nav-item.active,
+.nav-item:hover {
+  background: var(--brand-soft);
+  color: #5e4900;
+}
+
+.sidebar-bottom {
+  border-top-color: var(--brand-border);
+}
+
+.stat-icon.teal {
+  background: var(--brand-soft);
+  color: var(--brand-yellow-dark);
+}
+
+.chart-legend i,
+.teal-dot {
+  background: var(--brand-yellow);
+}
+
+.highlight-number,
+.warning,
+.approve,
+.yes {
+  color: var(--brand-yellow-dark);
+}
+
+.advance-salary {
+  color: #a16207;
+  font-weight: 700;
+}
+
+.auth-shell {
+  background: radial-gradient(circle at 20% 10%, #fff1b8 0, transparent 35%), var(--brand-cream);
+}
+
+.auth-card {
+  border-color: var(--brand-border);
+}
+
+.auth-tabs button.active {
+  color: var(--brand-yellow-dark);
+}
+
+/* Keep the existing utility-based pages on the same visual theme. */
+.text-teal-600,
+.text-teal-700,
+.text-teal-300 {
+  color: var(--brand-yellow-dark) !important;
+}
+
+.bg-teal-700 {
+  background-color: var(--brand-yellow) !important;
+  color: #332600 !important;
+}
+
+.bg-teal-100,
+.bg-teal-50 {
+  background-color: var(--brand-soft) !important;
+}
+
+.bg-teal-500 {
+  background-color: var(--brand-yellow) !important;
+}
+
+.text-teal-100 {
+  color: #fff8dc !important;
+}

@@ -40,5 +40,6 @@ async function downloadAttendanceCsv(filters = {}) { await ensureApiSession(); c
 async function getUsers(filters = {}) { await ensureApiSession(); const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)); return (await (await apiRequest(`/admin/users${query.toString() ? `?${query}` : ''}`)).json()); }
 async function createUser(payload) { await ensureApiSession(); return (await (await apiRequest('/admin/users', { method: 'POST', body: JSON.stringify(payload) }))).json(); }
 async function updateUser(id, payload) { await ensureApiSession(); return (await (await apiRequest(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) }))).json(); }
+async function changeAdminPassword(payload) { await ensureApiSession(); return (await (await apiRequest('/admin/change-password', { method: 'PUT', body: JSON.stringify(payload) }))).json(); }
 async function verifyAdminSmtp() { await ensureApiSession(); return (await (await apiRequest('/admin/email/verify'))).json(); }
 async function sendAdminTestEmail() { await ensureApiSession(); return (await (await apiRequest('/admin/email/test', { method: 'POST' }))).json(); }
