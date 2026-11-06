@@ -35,7 +35,7 @@ http://localhost:5000
 ```
 
 Kiểm tra backend:
-
+http://localhost:5500/index.html
 [http://localhost:5000/api/health](http://localhost:5000/api/health)
 
 Nếu hiển thị `status: ok` nghĩa là API đang hoạt động.
@@ -49,7 +49,7 @@ python -m http.server 5500
 
 Mở website:
 
-[http://localhost:5500/index.html](http://localhost:5500/index.html)
+[](http://localhost:5500/index.html)
 
 Trang đăng nhập:
 
@@ -75,14 +75,14 @@ Nếu không truy cập được, kiểm tra Windows Firewall và cho phép Node
 
 ## 5. Tài khoản mẫu
 
-| Vai trò | Tên đăng nhập | Mật khẩu ban đầu |
-|---|---|---|
-| Admin | `admin` | `admin123` |
-| Nhân viên | `minhanh` | `demo123` |
-| Nhân viên | `quocbao` | `demo123` |
-| Nhân viên | `hoangnam` | `demo123` |
-| Nhân viên | `giahuy` | `demo123` |
-| Nhân viên | `thanhtung` | `demo123` |
+| Vai trò   | Tên đăng nhập | Mật khẩu ban đầu |
+| --------- | ------------- | ---------------- |
+| Admin     | `admin`       | `admin123`       |
+| Nhân viên | `minhanh`     | `demo123`        |
+| Nhân viên | `quocbao`     | `demo123`        |
+| Nhân viên | `hoangnam`    | `demo123`        |
+| Nhân viên | `giahuy`      | `demo123`        |
+| Nhân viên | `thanhtung`   | `demo123`        |
 
 > Nếu mật khẩu Admin đã được đổi trong trang **Đổi mật khẩu**, hãy dùng mật khẩu mới thay cho mật khẩu ban đầu.
 
