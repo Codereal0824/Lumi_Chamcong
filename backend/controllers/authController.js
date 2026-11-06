@@ -176,4 +176,4 @@ async function verifyPasswordResetOtp(req, res) {
   const verifiedToken = jwt.sign({ purpose: 'password-reset-verified', otpId: record.id, userId: payload.userId }, secret(), { expiresIn: '10m' });
   res.json({ verifiedToken });
 }
-module.exports = { hashPassword, verifyPassword, login, register, requestPasswordReset, resendPasswordResetOtp, verifyPasswordResetOtp, verifyPasswordReset, POSITIONS, publicUser };
+module.exports = { hashPassword, login, register, requestPasswordReset, resendPasswordResetOtp, verifyPasswordResetOtp, verifyPasswordReset, POSITIONS, publicUser };

@@ -71,7 +71,6 @@ function initializeDatabase() {
   if (!columns.includes('late_minutes')) db.exec('ALTER TABLE attendances ADD COLUMN late_minutes INTEGER NOT NULL DEFAULT 0');
   if (!columns.includes('sunday_check_in')) db.exec('ALTER TABLE attendances ADD COLUMN sunday_check_in TEXT');
   if (!columns.includes('sunday_check_out')) db.exec('ALTER TABLE attendances ADD COLUMN sunday_check_out TEXT');
-  if (!columns.includes('advance_salary')) db.exec('ALTER TABLE attendances ADD COLUMN advance_salary REAL NOT NULL DEFAULT 0');
   db.exec('UPDATE attendances SET early_leave_hours = -ABS(early_leave_hours) WHERE early_leave_hours > 0');
   const duplicateAttendanceCount = db.prepare(`SELECT COUNT(*) AS count FROM (
     SELECT user_id, date FROM attendances GROUP BY user_id, date HAVING COUNT(*) > 1

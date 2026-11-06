@@ -26,10 +26,6 @@ function createAttendance(req, res) {
   if (![0, 1].includes(fieldTripDays)) {
     return res.status(400).json({ message: 'fieldTripDays chỉ nhận 0 (Không) hoặc 1 (Có).' });
   }
-  const advanceSalary = Number(body.advanceSalary || 0);
-  if (!Number.isFinite(advanceSalary) || advanceSalary < 0 || !Number.isInteger(advanceSalary)) {
-    return res.status(400).json({ message: 'Số tiền ứng lương phải là số nguyên không âm.' });
-  }
   const sundayWork = leaveDays !== 1 && (body.sundayWork === true || body.sundayWork === 1 || body.sundayWork === 'true');
   let sundayCheckIn = null;
   let sundayCheckOut = null;
@@ -47,14 +43,13 @@ function createAttendance(req, res) {
   }
   const result = db.prepare(`INSERT INTO attendances
     (user_id, date, check_in, check_out, leave_days, early_leave_hours, ot_hours, late_minutes,
-     sunday_work, sunday_check_in, sunday_check_out, field_trip_days, advance_salary, customer_name, note)
+     sunday_work, sunday_check_in, sunday_check_out, field_trip_days, customer_name, note)
     VALUES (@userId, @date, @checkIn, @checkOut, @leaveDays, @earlyLeaveHours, @otHours, @lateMinutes,
-     @sundayWork, @sundayCheckIn, @sundayCheckOut, @fieldTripDays, @advanceSalary, @customerName, @note)`).run({
+     @sundayWork, @sundayCheckIn, @sundayCheckOut, @fieldTripDays, @customerName, @note)`).run({
       userId: req.user.id, date: body.date, checkIn: body.checkIn, checkOut: body.checkOut,
       leaveDays, earlyLeaveHours, otHours: calculatedHours.otHours,
       lateMinutes: calculatedHours.lateMinutes, sundayWork: sundayWork ? 1 : 0,
-      sundayCheckIn, sundayCheckOut, fieldTripDays, advanceSalary,
-      customerName: body.customerName || '', note: body.note || ''
+      sundayCheckIn, sundayCheckOut, fieldTripDays, customerName: body.customerName || '', note: body.note || ''
     });
   res.status(201).json({ message: 'Báo cáo đã được tạo.', attendance: db.prepare('SELECT * FROM attendances WHERE id = ?').get(result.lastInsertRowid) });
 }
