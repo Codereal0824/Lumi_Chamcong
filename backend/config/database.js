@@ -72,9 +72,14 @@ function initializeDatabase() {
   if (!columns.includes('sunday_check_in')) db.exec('ALTER TABLE attendances ADD COLUMN sunday_check_in TEXT');
   if (!columns.includes('sunday_check_out')) db.exec('ALTER TABLE attendances ADD COLUMN sunday_check_out TEXT');
   db.exec('UPDATE attendances SET early_leave_hours = -ABS(early_leave_hours) WHERE early_leave_hours > 0');
-  db.exec(`DELETE FROM attendances
-    WHERE id NOT IN (SELECT MAX(id) FROM attendances GROUP BY user_id, date)`);
-  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_attendances_user_date ON attendances(user_id, date)');
+  const duplicateAttendanceCount = db.prepare(`SELECT COUNT(*) AS count FROM (
+    SELECT user_id, date FROM attendances GROUP BY user_id, date HAVING COUNT(*) > 1
+  )`).get().count;
+  if (duplicateAttendanceCount === 0) {
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_attendances_user_date ON attendances(user_id, date)');
+  } else {
+    console.warn(`Found ${duplicateAttendanceCount} duplicate attendance date group(s); unique index was not created.`);
+  }
   const users = [
     ['admin', 'admin123', 'Quản trị viên', 'admin'],
     ['minhanh', 'demo123', 'Nguyễn Minh Anh', 'technician'],
@@ -86,7 +91,7 @@ function initializeDatabase() {
   const insertUser = db.prepare('INSERT OR IGNORE INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, ?)');
   const hash = value => require('crypto').createHash('sha256').update(value).digest('hex');
   const seed = db.transaction(() => users.forEach(user => insertUser.run(user[0], hash(user[1]), user[2], user[3])));
-  seed();
+  if (process.env.NODE_ENV !== 'production') seed();
   db.exec("UPDATE users SET position = 'Kỹ thuật viên' WHERE position IS NULL OR position = ''");
   if (db.prepare('SELECT COUNT(*) AS count FROM attendances').get().count === 0) {
     const insertAttendance = db.prepare(`INSERT INTO attendances

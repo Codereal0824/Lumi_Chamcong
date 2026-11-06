@@ -20,12 +20,13 @@ async function login(username, password) {
 }
 async function registerAccount(payload) { return (await apiRequest('/auth/register', { method: 'POST', body: JSON.stringify(payload) })).json(); }
 async function requestPasswordReset(identifier) { return (await apiRequest('/auth/password-reset/request', { method: 'POST', body: JSON.stringify({ identifier }) })).json(); }
-async function getPasswordResetStatus(identifier) { return (await apiRequest('/auth/password-reset/status', { method: 'POST', body: JSON.stringify({ identifier }) })).json(); }
 async function verifyPasswordReset(payload) { return (await apiRequest('/auth/password-reset/verify', { method: 'POST', body: JSON.stringify(payload) })).json(); }
+async function verifyPasswordResetOtp(resetToken, otp) { return (await apiRequest('/auth/password-reset/verify-otp', { method: 'POST', body: JSON.stringify({ resetToken, otp }) })).json(); }
+async function resendPasswordResetOtp(resetToken) { return (await apiRequest('/auth/password-reset/resend', { method: 'POST', body: JSON.stringify({ resetToken }) })).json(); }
 function requireSession(role) {
   const user = getStoredUser();
   if (!apiToken || !user || (role && user.role !== role)) {
-    window.location.href = `../../auth.html?role=${role || ''}&next=${encodeURIComponent(window.location.href)}`;
+    window.location.href = `../../auth.html?role=${role || ''}&next=${encodeURIComponent(`${window.location.pathname}${window.location.search}${window.location.hash}`)}`;
     return false;
   }
   return true;
@@ -39,9 +40,5 @@ async function downloadAttendanceCsv(filters = {}) { await ensureApiSession(); c
 async function getUsers(filters = {}) { await ensureApiSession(); const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)); return (await (await apiRequest(`/admin/users${query.toString() ? `?${query}` : ''}`)).json()); }
 async function createUser(payload) { await ensureApiSession(); return (await (await apiRequest('/admin/users', { method: 'POST', body: JSON.stringify(payload) }))).json(); }
 async function updateUser(id, payload) { await ensureApiSession(); return (await (await apiRequest(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) }))).json(); }
-async function getPasswordResetRequests(status = '') { await ensureApiSession(); const query = status ? `?status=${encodeURIComponent(status)}` : ''; return (await (await apiRequest(`/admin/password-reset-requests${query}`)).json()).data; }
-async function approvePasswordResetRequest(id) { await ensureApiSession(); return (await (await apiRequest(`/admin/password-reset-requests/${id}/approve`, { method: 'POST' }))).json(); }
-async function rejectPasswordResetRequest(id, reason) { await ensureApiSession(); return (await (await apiRequest(`/admin/password-reset-requests/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }))).json(); }
-async function resendPasswordResetOtp(id) { await ensureApiSession(); return (await (await apiRequest(`/admin/password-reset-requests/${id}/resend-otp`, { method: 'POST' }))).json(); }
 async function verifyAdminSmtp() { await ensureApiSession(); return (await (await apiRequest('/admin/email/verify'))).json(); }
 async function sendAdminTestEmail() { await ensureApiSession(); return (await (await apiRequest('/admin/email/test', { method: 'POST' }))).json(); }

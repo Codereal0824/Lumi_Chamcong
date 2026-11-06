@@ -4,6 +4,13 @@ function createAttendance(req, res) {
   const body = req.body;
   const required = ['date', 'checkIn', 'checkOut'];
   if (required.some(field => !body[field])) return res.status(400).json({ message: 'date, checkIn và checkOut là bắt buộc.' });
+  const dateParts = String(body.date).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const parsedDate = dateParts ? new Date(Date.UTC(Number(dateParts[1]), Number(dateParts[2]) - 1, Number(dateParts[3]))) : null;
+  const validDate = parsedDate && parsedDate.getUTCFullYear() === Number(dateParts[1])
+    && parsedDate.getUTCMonth() === Number(dateParts[2]) - 1 && parsedDate.getUTCDate() === Number(dateParts[3]);
+  if (!validDate) {
+    return res.status(400).json({ message: 'date phải có định dạng YYYY-MM-DD hợp lệ.' });
+  }
   if (![0, 0.5, 1].includes(Number(body.leaveDays || 0))) return res.status(400).json({ message: 'leaveDays chỉ nhận 0, 0.5 hoặc 1.' });
   const db = req.app.locals.db;
   const existing = db.prepare('SELECT id FROM attendances WHERE user_id = ? AND date = ? LIMIT 1').get(req.user.id, body.date);

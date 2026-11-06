@@ -1,6 +1,6 @@
 const ExcelJS = require('exceljs');
 const { POSITIONS, hashPassword, publicUser } = require('./authController');
-const { sendPasswordResetOtp, notifyAdminPasswordReset, verifySmtp, sendTestEmail } = require('../services/email');
+const { verifySmtp, sendTestEmail } = require('../services/email');
 
 function filters(req) {
   const { from_date: fromDate, to_date: toDate, employee_id: employeeId, status, position } = req.query;
@@ -36,8 +36,10 @@ function dashboardStats(req, res) {
   const { clause, params } = filters(req);
   const db = req.app.locals.db;
   const totals = db.prepare(`SELECT COALESCE(SUM(a.ot_hours),0) AS totalOtHours, COALESCE(SUM(a.field_trip_days),0) AS fieldTripDays, COALESCE(SUM(a.leave_days),0) AS leaveDays, COUNT(*) AS attendanceDays FROM attendances a JOIN users u ON u.id = a.user_id ${clause}`).get(params);
+  const employeeTotals = db.prepare("SELECT COUNT(*) AS totalEmployees, SUM(CASE WHEN account_status = 'active' THEN 1 ELSE 0 END) AS activeEmployees FROM users WHERE role = 'technician'").get();
+  const pendingReports = db.prepare('SELECT COUNT(*) AS count FROM attendances WHERE status = ?').get('pending').count;
   const byEmployee = db.prepare(`SELECT u.full_name AS name, COALESCE(SUM(a.ot_hours),0) AS otHours FROM attendances a JOIN users u ON u.id = a.user_id ${clause} GROUP BY a.user_id ORDER BY otHours DESC`).all(params);
-  res.json({ totals, byEmployee, workLocation: [{ label: 'Văn phòng', value: Math.max(0, totals.attendanceDays - totals.fieldTripDays) }, { label: 'Đi công tác', value: totals.fieldTripDays }] });
+  res.json({ totals: { ...totals, ...employeeTotals, pendingReports }, byEmployee, workLocation: [{ label: 'Văn phòng', value: Math.max(0, totals.attendanceDays - totals.fieldTripDays) }, { label: 'Đi công tác', value: totals.fieldTripDays }] });
 }
 async function exportExcel(req, res) {
   const { clause, params } = filters(req);
@@ -129,85 +131,6 @@ function getUser(req, res) {
   if (!user) return res.status(404).json({ message: 'Không tìm thấy nhân viên.' });
   res.json({ user: publicUser(user) });
 }
-function listPasswordResetRequests(req, res) {
-  const db = req.app.locals.db;
-  const status = String(req.query.status || '');
-  db.prepare("UPDATE password_reset_requests SET status = 'expired' WHERE status = 'pending' AND expires_at <= datetime('now')").run();
-  db.prepare("UPDATE password_reset_requests SET status = 'expired' WHERE status = 'approved' AND otp_expires_at <= datetime('now')").run();
-  const where = status && ['pending', 'approved', 'rejected', 'expired', 'completed'].includes(status) ? 'WHERE r.status = @status' : '';
-  const params = where ? { status } : {};
-  const rows = db.prepare(`SELECT r.*, u.full_name, u.username, u.email
-    FROM password_reset_requests r JOIN users u ON u.id = r.user_id
-    ${where} ORDER BY r.requested_at DESC, r.id DESC`).all(params);
-  res.json({ data: rows.map(row => ({
-    id: row.id, requestCode: `PR-${row.id}`, fullName: row.full_name, username: row.username,
-    email: row.email ? `${row.email.slice(0, 2)}***@${row.email.split('@')[1]}` : '',
-    requestedAt: row.requested_at, processedAt: row.processed_at, status: row.status,
-    rejectionReason: row.rejection_reason || '', processedBy: row.processed_by,
-    otpDeliveryStatus: row.otp_delivery_status || 'not_sent'
-  })) });
-}
-function getPasswordResetRequest(req, res) {
-  const row = req.app.locals.db.prepare(`SELECT r.*, u.full_name, u.username, u.email
-    FROM password_reset_requests r JOIN users u ON u.id = r.user_id WHERE r.id = ?`).get(Number(req.params.id));
-  if (!row) return res.status(404).json({ message: 'Không tìm thấy yêu cầu.' });
-  res.json({ request: { id: row.id, requestCode: `PR-${row.id}`, fullName: row.full_name, username: row.username, email: row.email, requestedAt: row.requested_at, processedAt: row.processed_at, status: row.status, rejectionReason: row.rejection_reason || '', processedBy: row.processed_by } });
-}
-async function approvePasswordReset(req, res) {
-  const db = req.app.locals.db;
-  const id = Number(req.params.id);
-  const request = db.prepare(`SELECT r.*, u.full_name, u.username, u.email FROM password_reset_requests r
-    JOIN users u ON u.id = r.user_id WHERE r.id = ?`).get(id);
-  if (!request) return res.status(404).json({ message: 'Không tìm thấy yêu cầu.' });
-  if (request.status !== 'pending') return res.status(409).json({ message: 'Yêu cầu đã được xử lý trước đó.' });
-  if (!request.email) return res.status(400).json({ message: 'Tài khoản chưa có email để nhận OTP.' });
-  if (new Date(request.expires_at.replace(' ', 'T') + 'Z') < new Date()) {
-    db.prepare("UPDATE password_reset_requests SET status = 'expired' WHERE id = ? AND status = 'pending'").run(id);
-    return res.status(409).json({ message: 'Yêu cầu đã hết hạn.' });
-  }
-  const otp = String(require('crypto').randomInt(100000, 1000000));
-  const otpHash = require('crypto').createHash('sha256').update(otp).digest('hex');
-  db.transaction(() => {
-    const result = db.prepare(`UPDATE password_reset_requests SET status = 'approved', processed_at = datetime('now'),
-      processed_by = ?, otp_hash = ?, otp_expires_at = datetime('now', '+5 minutes'), otp_attempts = 0, otp_used_at = NULL,
-      otp_sent_at = NULL, otp_delivery_status = 'sending'
-      WHERE id = ? AND status = 'pending'`).run(req.user.id, otpHash, id);
-    if (result.changes !== 1) throw new Error('Yêu cầu đã được xử lý trước đó.');
-  })();
-  try {
-    await sendPasswordResetOtp({ user: request, otp });
-  } catch (error) {
-    db.prepare(`UPDATE password_reset_requests SET otp_hash = NULL, otp_expires_at = NULL, otp_delivery_status = 'failed'
-      WHERE id = ? AND status = 'approved'`).run(id);
-    console.error('Password reset OTP delivery failed:', error.code || 'delivery');
-    return res.status(503).json({ message: 'Đã phê duyệt nhưng chưa gửi được OTP. Hãy dùng chức năng Gửi lại OTP.' });
-  }
-  db.prepare("UPDATE password_reset_requests SET otp_sent_at = datetime('now'), otp_delivery_status = 'sent' WHERE id = ? AND status = 'approved'").run(id);
-  res.json({ message: 'Đã duyệt yêu cầu và gửi OTP đến email nhân viên.' });
-}
-async function resendPasswordResetOtp(req, res) {
-  const db = req.app.locals.db;
-  const id = Number(req.params.id);
-  const request = db.prepare(`SELECT r.*, u.full_name, u.username, u.email FROM password_reset_requests r
-    JOIN users u ON u.id = r.user_id WHERE r.id = ?`).get(id);
-  if (!request) return res.status(404).json({ message: 'Không tìm thấy yêu cầu.' });
-  if (request.status !== 'approved') return res.status(409).json({ message: 'Chỉ có thể gửi lại OTP cho yêu cầu đã được duyệt.' });
-  if (!request.email) return res.status(400).json({ message: 'Tài khoản chưa có email để nhận OTP.' });
-  const otp = String(require('crypto').randomInt(100000, 1000000));
-  const otpHash = require('crypto').createHash('sha256').update(otp).digest('hex');
-  db.prepare(`UPDATE password_reset_requests SET otp_hash = ?, otp_expires_at = datetime('now', '+5 minutes'),
-    otp_attempts = 0, otp_used_at = NULL, otp_sent_at = NULL, otp_delivery_status = 'sending'
-    WHERE id = ? AND status = 'approved'`).run(otpHash, id);
-  try {
-    await sendPasswordResetOtp({ user: request, otp });
-  } catch (error) {
-    db.prepare("UPDATE password_reset_requests SET otp_hash = NULL, otp_expires_at = NULL, otp_delivery_status = 'failed' WHERE id = ? AND status = 'approved'").run(id);
-    console.error('Password reset OTP resend failed:', error.code || 'delivery');
-    return res.status(503).json({ message: 'Gửi lại OTP thất bại. Kiểm tra cấu hình SMTP rồi thử lại.' });
-  }
-  db.prepare("UPDATE password_reset_requests SET otp_sent_at = datetime('now'), otp_delivery_status = 'sent' WHERE id = ? AND status = 'approved'").run(id);
-  res.json({ message: 'Đã gửi lại OTP.' });
-}
 async function verifyEmailConfiguration(req, res) {
   try { res.json(await verifySmtp()); }
   catch (error) { res.status(error.code === 'authentication' ? 502 : 503).json({ message: error.message, type: error.code }); }
@@ -216,14 +139,4 @@ async function sendEmailTest(req, res) {
   try { await sendTestEmail(); res.json({ message: 'Đã gửi email kiểm tra đến Admin.' }); }
   catch (error) { res.status(error.code === 'authentication' ? 502 : 503).json({ message: error.message, type: error.code }); }
 }
-function rejectPasswordReset(req, res) {
-  const db = req.app.locals.db;
-  const id = Number(req.params.id);
-  const request = db.prepare('SELECT status FROM password_reset_requests WHERE id = ?').get(id);
-  if (!request) return res.status(404).json({ message: 'Không tìm thấy yêu cầu.' });
-  if (request.status !== 'pending') return res.status(409).json({ message: 'Yêu cầu đã được xử lý trước đó.' });
-  db.prepare(`UPDATE password_reset_requests SET status = 'rejected', processed_at = datetime('now'),
-    processed_by = ?, rejection_reason = ? WHERE id = ? AND status = 'pending'`).run(req.user.id, String(req.body.reason || '').trim().slice(0, 500) || null, id);
-  res.json({ message: 'Đã từ chối yêu cầu khôi phục mật khẩu.' });
-}
-module.exports = { listAttendances, updateStatus, dashboardStats, exportExcel, listUsers, createUser, updateUser, getUser, listPasswordResetRequests, getPasswordResetRequest, approvePasswordReset, rejectPasswordReset, resendPasswordResetOtp, verifyEmailConfiguration, sendEmailTest };
+module.exports = { listAttendances, updateStatus, dashboardStats, exportExcel, listUsers, createUser, updateUser, getUser, verifyEmailConfiguration, sendEmailTest };

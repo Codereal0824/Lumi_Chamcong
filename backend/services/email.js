@@ -1,8 +1,12 @@
 const nodemailer = require('nodemailer');
 
 function isConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER
-    && process.env.SMTP_PASS && process.env.ADMIN_NOTIFICATION_EMAIL);
+  return Boolean(process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS);
+}
+function requireAdminNotificationEmail() {
+  if (!process.env.ADMIN_NOTIFICATION_EMAIL) {
+    throw Object.assign(new Error('ADMIN_NOTIFICATION_EMAIL chưa được cấu hình.'), { code: 'configuration' });
+  }
 }
 function transporter() {
   if (!isConfigured()) throw new Error('SMTP chưa được cấu hình đầy đủ.');
@@ -22,10 +26,6 @@ function smtpError(error) {
     return { type: 'connection', message: 'Không thể kết nối SMTP Gmail. Kiểm tra host, port hoặc mạng.' };
   }
   return { type: 'delivery', message: 'Gửi email thất bại. Kiểm tra cấu hình SMTP và địa chỉ nhận.' };
-}
-function maskEmail(email) {
-  const [name, domain] = String(email).split('@');
-  return `${name.slice(0, 2)}***@${domain || ''}`;
 }
 function escapeHtml(value) {
   return String(value || '').replace(/[&<>"']/g, character => ({
@@ -50,21 +50,8 @@ async function verifySmtp() {
   catch (error) { const classified = smtpError(error); const wrapped = new Error(classified.message); wrapped.code = classified.type; wrapped.cause = error; throw wrapped; }
 }
 async function sendTestEmail() {
+  requireAdminNotificationEmail();
   return sendMail({ to: process.env.ADMIN_NOTIFICATION_EMAIL, subject: '[FieldFlow] Email kiểm tra SMTP', text: 'Email kiểm tra SMTP FieldFlow đã được gửi thành công.' });
-}
-async function notifyAdminPasswordReset({ request, user }) {
-  return sendMail({
-    to: process.env.ADMIN_NOTIFICATION_EMAIL,
-    subject: '[FieldFlow] Yêu cầu khôi phục mật khẩu',
-    text: [
-      'Có yêu cầu khôi phục mật khẩu mới trong FieldFlow.',
-      `Mã yêu cầu: PR-${request.id}`,
-      `Nhân viên: ${user.full_name}`,
-      `Tên đăng nhập: ${user.username}`,
-      `Thời gian gửi: ${request.requested_at}`,
-      `Email đăng ký: ${maskEmail(user.email)}`
-    ].join('\n')
-  });
 }
 async function sendPasswordResetOtp({ user, otp }) {
   return sendMail({
@@ -102,4 +89,4 @@ async function notifyPasswordChanged({ user }) {
     text: 'Mật khẩu tài khoản FieldFlow của bạn đã được thay đổi thành công. Nếu không phải bạn thực hiện, hãy liên hệ quản trị viên.'
   });
 }
-module.exports = { isConfigured, verifySmtp, sendTestEmail, notifyAdminPasswordReset, sendPasswordResetOtp, notifyPasswordChanged };
+module.exports = { isConfigured, verifySmtp, sendTestEmail, sendPasswordResetOtp, notifyPasswordChanged };

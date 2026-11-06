@@ -1,5 +1,11 @@
 const jwt = require('jsonwebtoken');
-const secret = () => process.env.JWT_SECRET || 'development-secret-change-me';
+function secret() {
+  const value = String(process.env.JWT_SECRET || '');
+  if (!value || value === 'replace-this-with-a-long-random-secret' || value === 'development-secret-change-me' || value.length < 32) {
+    throw new Error('JWT_SECRET chưa được cấu hình bằng chuỗi ngẫu nhiên tối thiểu 32 ký tự.');
+  }
+  return value;
+}
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
