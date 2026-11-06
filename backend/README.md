@@ -1,36 +1,113 @@
-# FieldFlow Backend
+# FieldFlow
 
-## Chạy local
+Hệ thống chấm công gồm:
+
+- `frontend`: giao diện website.
+- `backend`: API Node.js và cơ sở dữ liệu SQLite.
+
+## Yêu cầu
+
+- Node.js 18 trở lên
+- npm
+- VS Code (khuyến nghị)
+
+## Cách chạy
+
+### 1. Chạy backend
+
+Mở Terminal thứ nhất tại thư mục dự án:
 
 ```powershell
 cd backend
 Copy-Item .env.example .env
 npm install
-npm run dev
+npm start
 ```
 
-API chạy tại `http://localhost:5000`. Tài khoản demo:
+Backend chạy tại:
 
-- Admin: `admin` / `admin123`
-- Kỹ thuật viên: `minhanh` / `demo123`
+```text
+http://localhost:5000
+```
 
-SQLite được tạo tự động tại `backend/data/fieldflow.db`. Có thể đổi vị trí bằng `DATABASE_PATH`.
+Kiểm tra backend:
 
-Giờ chuẩn là `08:00 — 17:30`. Backend tự động tính `ot_hours` khi Check-out sau
-17:30 và `early_leave_hours` là số âm khi Check-out trước 17:30; không nhận giá
-trị phát sinh do người dùng tự nhập. Khi chọn làm Chủ nhật/ngày lễ, API yêu cầu
-thêm `sundayCheckIn` và `sundayCheckOut`. `fieldTripDays` chỉ nhận `0` (Không)
-hoặc `1` (Có).
+[http://localhost:5000/api/health](http://localhost:5000/api/health)
 
-Trên biểu mẫu, chọn `Không đi làm` sẽ khóa các nội dung chi tiết và gửi báo cáo
-với `leave_days = 1`. Backend khi nhận ngày nghỉ sẽ tự lưu giờ phát sinh, làm
-Chủ nhật và đi xa bằng `0`.
+Nếu thấy `status: ok` là backend đang chạy.
 
-Mỗi tài khoản chỉ được gửi một báo cáo cho một ngày. Nếu gửi lại cùng ngày,
-API trả lỗi `409` và không tạo thêm dòng chấm công.
+### 2. Chạy frontend
 
-## Database hiện tại và SQL Server
+Mở Terminal thứ hai tại thư mục dự án:
 
-Hiện tại dự án đã có database SQLite thật, được tạo tự động khi server khởi động. File schema để chuyển sang SQL Server nằm tại `backend/database/sqlserver-schema.sql`. Backend hiện tại đang dùng SQLite driver; sau khi bạn tạo SQL Server, cần thay lớp truy vấn trong `config/database.js` bằng driver SQL Server (`mssql`) và giữ nguyên các controller/routes.
+```powershell
+cd frontend
+python -m http.server 5500
+```
 
-File xuất báo cáo dùng định dạng `.xlsx` chuẩn qua ExcelJS, gồm các cột theo dữ liệu trên form (bao gồm khung giờ làm Chủ nhật/ngày lễ) và mở trực tiếp bằng Microsoft Excel không bị dồn dữ liệu vào cột A.
+Sau đó mở trang:
+
+[http://localhost:5500/index.html](http://localhost:5500/index.html)
+
+Trang đăng nhập:
+
+[http://localhost:5500/auth.html](http://localhost:5500/auth.html)
+
+## Tài khoản mẫu
+
+| Loại tài khoản | Tên đăng nhập | Mật khẩu |
+|---|---|---|
+| Admin | `admin` | `admin123` |
+| Nhân viên | `minhanh` | `demo123` |
+
+## Các trang chính
+
+- Admin Dashboard: [http://localhost:5500/views/admin/dashboard.html](http://localhost:5500/views/admin/dashboard.html)
+- Quản lý đội ngũ: [http://localhost:5500/views/admin/team.html](http://localhost:5500/views/admin/team.html)
+- Timesheet: [http://localhost:5500/views/admin/timesheet.html](http://localhost:5500/views/admin/timesheet.html)
+- Báo cáo cuối ngày: [http://localhost:5500/views/technician/report.html](http://localhost:5500/views/technician/report.html)
+
+## Database
+
+SQLite được tạo tự động tại:
+
+```text
+backend/data/fieldflow.db
+```
+
+Không cần tạo database thủ công. Không xóa file database nếu muốn giữ tài khoản
+và lịch sử chấm công.
+
+## Cấu hình email khôi phục mật khẩu
+
+Sao chép `.env.example` thành `.env`, sau đó điền thông tin SMTP Gmail:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-gmail@gmail.com
+SMTP_PASS=your-gmail-app-password
+SMTP_FROM=your-gmail@gmail.com
+ADMIN_NOTIFICATION_EMAIL=admin@example.com
+```
+
+Gmail cần bật xác thực 2 bước và tạo **App Password**. Không dùng mật khẩu
+Gmail thông thường và không đưa file `.env` lên Git. Nếu chưa cấu hình SMTP,
+email sẽ không được gửi.
+
+## Lưu ý
+
+- Tài khoản đăng ký mới luôn có quyền nhân viên.
+- Admin gán chức vụ: Kỹ thuật viên, Kế toán, Sale hoặc Marketing.
+- Không chọn vai trò khi đăng nhập; hệ thống tự nhận diện vai trò từ database.
+- Mỗi tài khoản chỉ gửi được một báo cáo cho một ngày.
+- File Excel xuất ra có dòng tổng cho nghỉ phép, về sớm, OT, làm Chủ nhật và đi xa.
+
+## Dừng chương trình
+
+Trong mỗi Terminal đang chạy, nhấn:
+
+```text
+Ctrl + C
+```
